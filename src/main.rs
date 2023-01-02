@@ -1,18 +1,18 @@
 use anyhow::anyhow;
 use clap::{arg, Command};
-use serde::Deserialize;
-use serde_json::json;
+use serde_json::{json, Value};
 use std::{
+    collections::HashMap,
     io::{Read, Write},
     net,
 };
 
 /*
-            'info'     : '{"system":{"get_sysinfo":{}}}',
+ *          'info'     : '{"system":{"get_sysinfo":{}}}',
             'on'       : '{"system":{"set_relay_state":{"state":1}}}',
             'off'      : '{"system":{"set_relay_state":{"state":0}}}',
-            'ledoff'   : '{"system":{"set_led_off":{"off":1}}}',
-            'ledon'    : '{"system":{"set_led_off":{"off":0}}}',
+ *          'ledoff'   : '{"system":{"set_led_off":{"off":1}}}',
+ *          'ledon'    : '{"system":{"set_led_off":{"off":0}}}',
             'cloudinfo': '{"cnCloud":{"get_info":{}}}',
             'wlanscan' : '{"netif":{"get_scaninfo":{"refresh":0}}}',
             'time'     : '{"time":{"get_time":{}}}',
@@ -24,21 +24,6 @@ use std::{
             'energy'   : '{"emeter":{"get_realtime":{}}}'
 */
 
-#[derive(Deserialize, Debug)]
-struct InfoResponse {
-    system: GetSysInfo,
-}
-
-#[derive(Deserialize, Debug)]
-struct GetSysInfo {
-    get_sysinfo: SysInfo,
-}
-
-#[derive(Deserialize, Debug)]
-struct SysInfo {
-    led_off: u8,
-}
-
 fn main() -> anyhow::Result<()> {
     let matches = cli().get_matches();
 
@@ -48,47 +33,111 @@ fn main() -> anyhow::Result<()> {
 
     match matches.subcommand() {
         Some(("info", _)) => {
-            let request = encrypt(r#"{"system":{"get_sysinfo":{}}}"#.to_string());
+            let request = encrypt(json!({"system": {"get_sysinfo": {} }}).to_string());
             let mut stream = net::TcpStream::connect(addr)?;
             stream.write(&request)?;
 
-            let response = &mut [0u8; 1024];
-            let nread = stream.read(response)?;
-            let response = decrypt(&response[..nread])?;
-            println!("{response}");
+            let buf = &mut [0u8; 1024];
+            let nread = stream.read(buf)?;
+            let response = decrypt(&buf[..nread])?;
+
+            let response = serde_json::from_str::<HashMap<String, Value>>(&response)?;
+            println!("{:#?}", response)
         }
         Some(("led", sub_matches)) => {
-            let set_led_off = match (sub_matches.get_flag("on"), sub_matches.get_flag("off")) {
-                (true, false) => Some(0),
-                (false, true) => Some(1),
-                _ => None,
-            };
+            let switch_on = sub_matches.get_flag("on");
+            let switch_off = sub_matches.get_flag("off");
 
-            let request = match set_led_off {
-                Some(value) => json!({"system": {"set_led_off": {"off": value }}}).to_string(),
-                None => r#"{"system":{"get_sysinfo":{}}}"#.to_string(),
-            };
-            let request = encrypt(request);
+            // Clap disallows to set both flags at the same time:
+            if switch_on ^ switch_off {
+                let request = encrypt(
+                    json!({"system": {"set_led_off": {"off": switch_off as u8 }}}).to_string(),
+                );
+                let mut stream = net::TcpStream::connect(addr.clone())?;
+
+                stream.write(&request)?;
+                let buf = &mut [0u8; 1024];
+                let nread = stream.read(buf)?;
+                let response = decrypt(&buf[..nread])?;
+
+                let response = serde_json::from_str::<HashMap<String, Value>>(&response)?;
+                let status = response
+                    .get("system")
+                    .ok_or_else(|| {
+                        eprintln!("Response: {:#?}", &response);
+                        anyhow!("`system` object is not available in the response")
+                    })?
+                    .get("set_led_off")
+                    .ok_or_else(|| {
+                        eprintln!("Response: {:#?}", &response);
+                        anyhow!("`set_led_off` object in not available in the response")
+                    })?
+                    .get("err_code")
+                    .ok_or_else(|| {
+                        eprintln!("Response: {:#?}", &response);
+                        anyhow!("`err_code` field in not available in the response")
+                    })?;
+                println!(
+                    "Operation has {}",
+                    if status == 0 { "succeeded" } else { "failed" }
+                );
+            }
+
+            let request = encrypt(json!({"system": {"get_sysinfo": {} }}).to_string());
             let mut stream = net::TcpStream::connect(addr)?;
 
             stream.write(&request)?;
+            let buf = &mut [0u8; 1024];
+            let nread = stream.read(buf)?;
+            let response = decrypt(&buf[..nread])?;
 
-            let response = &mut [0u8; 1024];
-            let nread = stream.read(response)?;
-            let response = decrypt(&response[..nread])?;
-
-            match set_led_off {
-                Some(_) => {
-                    println!("{response}");
-                }
-                None => {
-                    let led_status = serde_json::from_str::<InfoResponse>(&response)?
-                        .system
-                        .get_sysinfo
-                        .led_off;
-                    println!("LED is {}", if led_status == 0 { "ON" } else { "OFF" });
-                }
-            };
+            let response = serde_json::from_str::<HashMap<String, Value>>(&response)?;
+            let sysinfo = response
+                .get("system")
+                .ok_or_else(|| {
+                    eprintln!("Response: {:#?}", &response);
+                    anyhow!("`system` object is not available in the response")
+                })?
+                .get("get_sysinfo")
+                .ok_or_else(|| {
+                    eprintln!("Response: {:#?}", &response);
+                    anyhow!("`get_sysinfo` object in not available in the response")
+                })?;
+            let led_off = sysinfo.get("led_off").ok_or_else(|| {
+                eprintln!("get_sysinfo: {:#?}", &sysinfo);
+                anyhow!("`led_off` field in not available in the response")
+            })?;
+            println!("LED is {}", if led_off == 0 { "ON" } else { "OFF" });
+            /*
+             * {
+             *   "system": {
+             *     "get_sysinfo": {
+             *       "err_code": 0,
+             *       "sw_ver": "1.2.6 Build 200727 Rel.120821",
+             *       "hw_ver": "1.0",
+             *       "type": "IOT.SMARTPLUGSWITCH",
+             *       "model": "HS110(EU)",
+             *       "mac": "70:4F:57:58:CD:5D",
+             *       "deviceId": "8006EB1F5E6DADEFC7F38360A3640B1D1910D881",
+             *       "hwId": "45E29DA8382494D2E82688B52A0B2EB5",
+             *       "fwId": "00000000000000000000000000000000",
+             *       "oemId": "3D341ECE302C0642C99E31CE2430544B",
+             *       "alias": "Fan and vacuum",
+             *       "dev_name": "Wi-Fi Smart Plug With Energy Monitoring",
+             *       "icon_hash": "",
+             *       "relay_state": 1,
+             *       "on_time": 247235,
+             *       "active_mode": "schedule",
+             *       "feature": "TIM:ENE",
+             *       "updating": 0,
+             *       "rssi": -45,
+             *       "led_off": 1,
+             *       "latitude": 47.784857,
+             *       "longitude": 35.184122
+             *     }
+             *   }
+             * }
+             */
         }
         Some((_ext, _sub_matches)) => {
             unimplemented!()
