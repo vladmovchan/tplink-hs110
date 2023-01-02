@@ -1,5 +1,7 @@
 use anyhow::anyhow;
 use clap::{arg, Command};
+use serde::Deserialize;
+use serde_json::json;
 use std::{
     io::{Read, Write},
     net,
@@ -22,6 +24,21 @@ use std::{
             'energy'   : '{"emeter":{"get_realtime":{}}}'
 */
 
+#[derive(Deserialize, Debug)]
+struct InfoResponse {
+    system: GetSysInfo,
+}
+
+#[derive(Deserialize, Debug)]
+struct GetSysInfo {
+    get_sysinfo: SysInfo,
+}
+
+#[derive(Deserialize, Debug)]
+struct SysInfo {
+    led_off: u8,
+}
+
 fn main() -> anyhow::Result<()> {
     let matches = cli().get_matches();
 
@@ -37,25 +54,41 @@ fn main() -> anyhow::Result<()> {
 
             let response = &mut [0u8; 1024];
             let nread = stream.read(response)?;
-            println!("{}", decrypt(&response[..nread])?);
+            let response = decrypt(&response[..nread])?;
+            println!("{response}");
         }
         Some(("led", sub_matches)) => {
-            let on = sub_matches.get_flag("on");
-            let off = sub_matches.get_flag("off");
-
-            let request = match (on, off) {
-                (true, false) => r#"{"system":{"set_led_off":{"off":0}}}"#,
-                (false, true) => r#"{"system":{"set_led_off":{"off":1}}}"#,
-                _ => r#"{"system":{"get_sysinfo":{}}}"#,
+            let set_led_off = match (sub_matches.get_flag("on"), sub_matches.get_flag("off")) {
+                (true, false) => Some(0),
+                (false, true) => Some(1),
+                _ => None,
             };
-            let request = encrypt(request.to_string());
+
+            let request = match set_led_off {
+                Some(value) => json!({"system": {"set_led_off": {"off": value }}}).to_string(),
+                None => r#"{"system":{"get_sysinfo":{}}}"#.to_string(),
+            };
+            let request = encrypt(request);
             let mut stream = net::TcpStream::connect(addr)?;
 
             stream.write(&request)?;
 
             let response = &mut [0u8; 1024];
             let nread = stream.read(response)?;
-            println!("{}", decrypt(&response[..nread])?);
+            let response = decrypt(&response[..nread])?;
+
+            match set_led_off {
+                Some(_) => {
+                    println!("{response}");
+                }
+                None => {
+                    let led_status = serde_json::from_str::<InfoResponse>(&response)?
+                        .system
+                        .get_sysinfo
+                        .led_off;
+                    println!("LED is {}", if led_status == 0 { "ON" } else { "OFF" });
+                }
+            };
         }
         Some((_ext, _sub_matches)) => {
             unimplemented!()
@@ -126,13 +159,12 @@ fn decrypt(data: &[u8]) -> anyhow::Result<String> {
     }
 
     let mut key = 171;
-
     let decrypted: String = data[4..]
         .iter()
         .map(|byte| {
-            let symbol = (key ^ byte) as char;
+            let plain_char = (key ^ byte) as char;
             key = *byte;
-            symbol
+            plain_char
         })
         .collect();
 
