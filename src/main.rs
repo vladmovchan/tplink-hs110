@@ -71,14 +71,18 @@ impl HS110 {
         Ok(decrypted)
     }
 
-    fn info(&self) -> anyhow::Result<String> {
-        let request = Self::encrypt(json!({"system": {"get_sysinfo": {} }}).to_string());
+    fn request(&self, request: Value) -> anyhow::Result<String> {
+        let request = Self::encrypt(request.to_string());
         let mut stream = net::TcpStream::connect(self.addr.clone())?;
-        stream.write_all(&request)?;
 
-        let buf = &mut [0u8; 1024];
+        stream.write_all(&request)?;
+        let buf = &mut [0u8; 8192];
         let nread = stream.read(buf)?;
         Self::decrypt(&buf[..nread])
+    }
+
+    fn info(&self) -> anyhow::Result<String> {
+        self.request(json!({"system": {"get_sysinfo": {} }}))
     }
 
     fn info_deserialized(&self) -> anyhow::Result<HashMap<String, Value>> {
@@ -109,14 +113,7 @@ impl HS110 {
     }
 
     fn set_led_state(&self, on: bool) -> anyhow::Result<String> {
-        let request =
-            Self::encrypt(json!({"system": {"set_led_off": {"off": !on as u8 }}}).to_string());
-        let mut stream = net::TcpStream::connect(self.addr.clone())?;
-
-        stream.write_all(&request)?;
-        let buf = &mut [0u8; 1024];
-        let nread = stream.read(buf)?;
-        Self::decrypt(&buf[..nread])
+        self.request(json!({"system": {"set_led_off": {"off": !on as u8 }}}))
     }
 
     fn set_led_state_deserialized(&self, on: bool) -> anyhow::Result<bool> {
@@ -150,7 +147,7 @@ fn main() -> anyhow::Result<()> {
 
     match matches.subcommand() {
         Some(("info", _)) => {
-            println!("{:#?}", hs110.info_deserialized())
+            println!("{:#?}", hs110.info_deserialized()?)
         }
         Some(("led", sub_matches)) => {
             let switch_on = sub_matches.get_flag("on");
