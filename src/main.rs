@@ -37,7 +37,7 @@ impl HS110 {
         let mut key = 171;
         let mut result = (string.len() as u32).to_be_bytes().to_vec();
         for b in string.into_bytes() {
-            key = key ^ b;
+            key ^= b;
             result.push(key);
         }
         result
@@ -74,11 +74,11 @@ impl HS110 {
     fn info(&self) -> anyhow::Result<String> {
         let request = Self::encrypt(json!({"system": {"get_sysinfo": {} }}).to_string());
         let mut stream = net::TcpStream::connect(self.addr.clone())?;
-        stream.write(&request)?;
+        stream.write_all(&request)?;
 
         let buf = &mut [0u8; 1024];
         let nread = stream.read(buf)?;
-        Ok(Self::decrypt(&buf[..nread])?)
+        Self::decrypt(&buf[..nread])
     }
 
     fn info_deserialized(&self) -> anyhow::Result<HashMap<String, Value>> {
@@ -105,7 +105,7 @@ impl HS110 {
             anyhow!("`led_off` field in not available in the response")
         })?;
 
-        Ok(if led_off == 0 { true } else { false })
+        Ok(led_off == 0)
     }
 
     fn set_led_state(&self, on: bool) -> anyhow::Result<String> {
@@ -113,10 +113,10 @@ impl HS110 {
             Self::encrypt(json!({"system": {"set_led_off": {"off": !on as u8 }}}).to_string());
         let mut stream = net::TcpStream::connect(self.addr.clone())?;
 
-        stream.write(&request)?;
+        stream.write_all(&request)?;
         let buf = &mut [0u8; 1024];
         let nread = stream.read(buf)?;
-        Ok(Self::decrypt(&buf[..nread])?)
+        Self::decrypt(&buf[..nread])
     }
 
     fn set_led_state_deserialized(&self, on: bool) -> anyhow::Result<bool> {
