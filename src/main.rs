@@ -14,7 +14,7 @@ use std::{
  *          'ledoff'   : '{"system":{"set_led_off":{"off":1}}}',
  *          'ledon'    : '{"system":{"set_led_off":{"off":0}}}',
  *          'cloudinfo': '{"cnCloud":{"get_info":{}}}',
-            'wlanscan' : '{"netif":{"get_scaninfo":{"refresh":0}}}',
+ *          'wlanscan' : '{"netif":{"get_scaninfo":{"refresh":0}}}',
             'time'     : '{"time":{"get_time":{}}}',
             'schedule' : '{"schedule":{"get_rules":{}}}',
             'countdown': '{"count_down":{"get_rules":{}}}',
@@ -83,7 +83,7 @@ impl HS110 {
     }
 
     fn info(&self) -> anyhow::Result<String> {
-        self.request(json!({"system": {"get_sysinfo": {} }}))
+        self.request(json!({"system": {"get_sysinfo": {}}}))
     }
 
     fn info_deserialized(&self) -> anyhow::Result<HashMap<String, Value>> {
@@ -174,13 +174,39 @@ impl HS110 {
     }
 
     fn cloudinfo(&self) -> anyhow::Result<String> {
-        self.request(json!({"cnCloud": {"get_info": {} }}))
+        self.request(json!({"cnCloud": {"get_info": {}}}))
     }
 
     fn cloudinfo_deserialized(&self) -> anyhow::Result<HashMap<String, Value>> {
         Ok(serde_json::from_str::<HashMap<String, Value>>(
             &self.cloudinfo()?,
         )?)
+    }
+
+    fn wlanscan(&self, refresh: bool) -> anyhow::Result<String> {
+        self.request(json!({"netif": {"get_scaninfo": {"refresh": refresh as u8}}}))
+    }
+
+    fn wlanscan_deserialized(&self, refresh: bool) -> anyhow::Result<Value> {
+        let response = serde_json::from_str::<HashMap<String, Value>>(&self.wlanscan(refresh)?)?;
+        let ap_list = response
+            .get("netif")
+            .ok_or_else(|| {
+                eprintln!("Response: {:#?}", &response);
+                anyhow!("`netif` object is not available in the response")
+            })?
+            .get("get_scaninfo")
+            .ok_or_else(|| {
+                eprintln!("Response: {:#?}", &response);
+                anyhow!("`get_scaninfo` object in not available in the response")
+            })?
+            .get("ap_list")
+            .ok_or_else(|| {
+                eprintln!("Response: {:#?}", &response);
+                anyhow!("`ap_list` field in not available in the response")
+            })?;
+
+        Ok(ap_list.clone())
     }
 }
 
@@ -245,10 +271,20 @@ fn main() -> anyhow::Result<()> {
         Some(("cloudinfo", _)) => {
             println!("{:#?}", hs110.cloudinfo_deserialized()?)
         }
-        Some((_ext, _sub_matches)) => {
-            unimplemented!()
+        Some(("wifi", sub_matches)) => match sub_matches.subcommand() {
+            Some(("scan", _)) => {
+                println!("{:#?}", hs110.wlanscan_deserialized(true)?);
+            }
+            Some(("list", _)) => {
+                println!("{:#?}", hs110.wlanscan_deserialized(false)?)
+            }
+            _ => {
+                unreachable!()
+            }
+        },
+        _ => {
+            unreachable!()
         }
-        None => {}
     }
 
     Ok(())
@@ -271,7 +307,7 @@ fn cli() -> Command {
         .allow_external_subcommands(true)
         .subcommand(Command::new("info").about("Get smartplug system information"))
         .subcommand(Command::new("info-raw").about(
-            "Get smartplug system information providing the respose as it is, without parsing",
+            "Get smartplug system information providing the response as it is, without parsing",
         ))
         .subcommand(
             Command::new("led")
@@ -306,4 +342,17 @@ fn cli() -> Command {
                 ),
         )
         .subcommand(Command::new("cloudinfo").about("Get cloud information"))
+        .subcommand(
+            Command::new("wifi")
+                .about("Scan and list available wifi stations")
+                .arg_required_else_help(true)
+                .subcommand_required(true)
+                .subcommand(
+                    Command::new("scan").about("Scan and list available wifi access points"),
+                )
+                .subcommand(
+                    Command::new("list")
+                        .about("List available wifi access points without performing a scan"),
+                ),
+        )
 }
