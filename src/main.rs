@@ -82,18 +82,18 @@ impl HS110 {
         Self::decrypt(&buf[..nread])
     }
 
-    fn info(&self) -> anyhow::Result<String> {
+    fn info_raw(&self) -> anyhow::Result<String> {
         self.request(json!({"system": {"get_sysinfo": {}}}))
     }
 
-    fn info_deserialized(&self) -> anyhow::Result<HashMap<String, Value>> {
+    fn info_parsed(&self) -> anyhow::Result<HashMap<String, Value>> {
         Ok(serde_json::from_str::<HashMap<String, Value>>(
-            &self.info()?,
+            &self.info_raw()?,
         )?)
     }
 
-    fn info_field(&self, field: &str) -> anyhow::Result<Value> {
-        let response = self.info_deserialized()?;
+    fn info_field_value(&self, field: &str) -> anyhow::Result<Value> {
+        let response = self.info_parsed()?;
         let sysinfo = response
             .get("system")
             .ok_or_else(|| {
@@ -114,15 +114,16 @@ impl HS110 {
     }
 
     fn led_status(&self) -> anyhow::Result<bool> {
-        Ok(self.info_field("led_off")? == 0)
+        Ok(self.info_field_value("led_off")? == 0)
     }
 
-    fn set_led_state(&self, on: bool) -> anyhow::Result<String> {
+    fn set_led_state_raw(&self, on: bool) -> anyhow::Result<String> {
         self.request(json!({"system": {"set_led_off": {"off": !on as u8 }}}))
     }
 
-    fn set_led_state_deserialized(&self, on: bool) -> anyhow::Result<bool> {
-        let response = serde_json::from_str::<HashMap<String, Value>>(&self.set_led_state(on)?)?;
+    fn set_led_state_parsed(&self, on: bool) -> anyhow::Result<bool> {
+        let response =
+            serde_json::from_str::<HashMap<String, Value>>(&self.set_led_state_raw(on)?)?;
         let err_code = response
             .get("system")
             .ok_or_else(|| {
@@ -143,16 +144,16 @@ impl HS110 {
     }
 
     fn power_state(&self) -> anyhow::Result<bool> {
-        Ok(self.info_field("relay_state")? == 1)
+        Ok(self.info_field_value("relay_state")? == 1)
     }
 
-    fn set_power_state(&self, state: bool) -> anyhow::Result<String> {
+    fn set_power_state_raw(&self, state: bool) -> anyhow::Result<String> {
         self.request(json!({"system": {"set_relay_state": {"state": state as u8 }}}))
     }
 
-    fn set_power_state_deserialized(&self, state: bool) -> anyhow::Result<bool> {
+    fn set_power_state_parsed(&self, state: bool) -> anyhow::Result<bool> {
         let response =
-            serde_json::from_str::<HashMap<String, Value>>(&self.set_power_state(state)?)?;
+            serde_json::from_str::<HashMap<String, Value>>(&self.set_power_state_raw(state)?)?;
         println!("{:#?}", response);
         let err_code = response
             .get("system")
@@ -173,22 +174,22 @@ impl HS110 {
         Ok(err_code == 0)
     }
 
-    fn cloudinfo(&self) -> anyhow::Result<String> {
+    fn cloudinfo_raw(&self) -> anyhow::Result<String> {
         self.request(json!({"cnCloud": {"get_info": {}}}))
     }
 
-    fn cloudinfo_deserialized(&self) -> anyhow::Result<HashMap<String, Value>> {
+    fn cloudinfo_parsed(&self) -> anyhow::Result<HashMap<String, Value>> {
         Ok(serde_json::from_str::<HashMap<String, Value>>(
-            &self.cloudinfo()?,
+            &self.cloudinfo_raw()?,
         )?)
     }
 
-    fn wlanscan(&self, refresh: bool) -> anyhow::Result<String> {
+    fn ap_list_raw(&self, refresh: bool) -> anyhow::Result<String> {
         self.request(json!({"netif": {"get_scaninfo": {"refresh": refresh as u8}}}))
     }
 
-    fn wlanscan_deserialized(&self, refresh: bool) -> anyhow::Result<Value> {
-        let response = serde_json::from_str::<HashMap<String, Value>>(&self.wlanscan(refresh)?)?;
+    fn ap_list_parsed(&self, refresh: bool) -> anyhow::Result<Value> {
+        let response = serde_json::from_str::<HashMap<String, Value>>(&self.ap_list_raw(refresh)?)?;
         let ap_list = response
             .get("netif")
             .ok_or_else(|| {
@@ -219,10 +220,10 @@ fn main() -> anyhow::Result<()> {
 
     match matches.subcommand() {
         Some(("info-raw", _)) => {
-            println!("{}", hs110.info()?)
+            println!("{}", hs110.info_raw()?)
         }
         Some(("info", _)) => {
-            println!("{:#?}", hs110.info_deserialized()?)
+            println!("{:#?}", hs110.info_parsed()?)
         }
         Some(("led", sub_matches)) => {
             let switch_on = sub_matches.get_flag("on");
@@ -236,7 +237,7 @@ fn main() -> anyhow::Result<()> {
                     return Ok(());
                 }
 
-                let status = hs110.set_led_state_deserialized(switch_on)?;
+                let status = hs110.set_led_state_parsed(switch_on)?;
                 println!(
                     "Operation has {}",
                     if status { "succeeded" } else { "failed" }
@@ -258,7 +259,7 @@ fn main() -> anyhow::Result<()> {
                     return Ok(());
                 }
 
-                let status = hs110.set_power_state_deserialized(switch_on)?;
+                let status = hs110.set_power_state_parsed(switch_on)?;
                 println!(
                     "Operation has {}",
                     if status { "succeeded" } else { "failed" }
@@ -269,14 +270,14 @@ fn main() -> anyhow::Result<()> {
             println!("Power is {}", if power { "ON" } else { "OFF" });
         }
         Some(("cloudinfo", _)) => {
-            println!("{:#?}", hs110.cloudinfo_deserialized()?)
+            println!("{:#?}", hs110.cloudinfo_parsed()?)
         }
         Some(("wifi", sub_matches)) => match sub_matches.subcommand() {
             Some(("scan", _)) => {
-                println!("{:#?}", hs110.wlanscan_deserialized(true)?);
+                println!("{:#?}", hs110.ap_list_parsed(true)?);
             }
             Some(("list", _)) => {
-                println!("{:#?}", hs110.wlanscan_deserialized(false)?)
+                println!("{:#?}", hs110.ap_list_parsed(false)?)
             }
             _ => {
                 unreachable!()
