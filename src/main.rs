@@ -13,7 +13,7 @@ use std::{
  *          'off'      : '{"system":{"set_relay_state":{"state":0}}}',
  *          'ledoff'   : '{"system":{"set_led_off":{"off":1}}}',
  *          'ledon'    : '{"system":{"set_led_off":{"off":0}}}',
-            'cloudinfo': '{"cnCloud":{"get_info":{}}}',
+ *          'cloudinfo': '{"cnCloud":{"get_info":{}}}',
             'wlanscan' : '{"netif":{"get_scaninfo":{"refresh":0}}}',
             'time'     : '{"time":{"get_time":{}}}',
             'schedule' : '{"schedule":{"get_rules":{}}}',
@@ -172,6 +172,16 @@ impl HS110 {
             })?;
         Ok(err_code == 0)
     }
+
+    fn cloudinfo(&self) -> anyhow::Result<String> {
+        self.request(json!({"cnCloud": {"get_info": {} }}))
+    }
+
+    fn cloudinfo_deserialized(&self) -> anyhow::Result<HashMap<String, Value>> {
+        Ok(serde_json::from_str::<HashMap<String, Value>>(
+            &self.cloudinfo()?,
+        )?)
+    }
 }
 
 fn main() -> anyhow::Result<()> {
@@ -231,6 +241,9 @@ fn main() -> anyhow::Result<()> {
 
             let power = hs110.power_state()?;
             println!("Power is {}", if power { "ON" } else { "OFF" });
+        }
+        Some(("cloudinfo", _)) => {
+            println!("{:#?}", hs110.cloudinfo_deserialized()?)
         }
         Some((_ext, _sub_matches)) => {
             unimplemented!()
@@ -292,4 +305,5 @@ fn cli() -> Command {
                         .conflicts_with("on"),
                 ),
         )
+        .subcommand(Command::new("cloudinfo").about("Get cloud information"))
 }
