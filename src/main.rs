@@ -92,7 +92,7 @@ impl HS110 {
         )?)
     }
 
-    fn led_status(&self) -> anyhow::Result<bool> {
+    fn info_field(&self, field: &str) -> anyhow::Result<Value> {
         let response = self.info_deserialized()?;
         let sysinfo = response
             .get("system")
@@ -105,12 +105,16 @@ impl HS110 {
                 eprintln!("Response: {:#?}", &response);
                 anyhow!("`get_sysinfo` object in not available in the response")
             })?;
-        let led_off = sysinfo.get("led_off").ok_or_else(|| {
+        let value = sysinfo.get(field).ok_or_else(|| {
             eprintln!("get_sysinfo: {:#?}", &sysinfo);
-            anyhow!("`led_off` field in not available in the response")
+            anyhow!(format!("`{field}` field in not available in the response"))
         })?;
 
-        Ok(led_off == 0)
+        Ok(value.clone())
+    }
+
+    fn led_status(&self) -> anyhow::Result<bool> {
+        Ok(self.info_field("led_off")? == 0)
     }
 
     fn set_led_state(&self, on: bool) -> anyhow::Result<String> {
@@ -139,24 +143,7 @@ impl HS110 {
     }
 
     fn power_state(&self) -> anyhow::Result<bool> {
-        let response = self.info_deserialized()?;
-        let sysinfo = response
-            .get("system")
-            .ok_or_else(|| {
-                eprintln!("Response: {:#?}", &response);
-                anyhow!("`system` object is not available in the response")
-            })?
-            .get("get_sysinfo")
-            .ok_or_else(|| {
-                eprintln!("Response: {:#?}", &response);
-                anyhow!("`get_sysinfo` object in not available in the response")
-            })?;
-        let state = sysinfo.get("relay_state").ok_or_else(|| {
-            eprintln!("get_sysinfo: {:#?}", &sysinfo);
-            anyhow!("`relay_state` field in not available in the response")
-        })?;
-
-        Ok(state == 1)
+        Ok(self.info_field("relay_state")? == 1)
     }
 
     fn set_power_state(&self, state: bool) -> anyhow::Result<String> {
