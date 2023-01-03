@@ -178,10 +178,21 @@ impl HS110 {
         self.request(json!({"cnCloud": {"get_info": {}}}))
     }
 
-    fn cloudinfo_parsed(&self) -> anyhow::Result<HashMap<String, Value>> {
-        Ok(serde_json::from_str::<HashMap<String, Value>>(
-            &self.cloudinfo_raw()?,
-        )?)
+    fn cloudinfo_parsed(&self) -> anyhow::Result<Value> {
+        let response = serde_json::from_str::<HashMap<String, Value>>(&self.cloudinfo_raw()?)?;
+        let cloudinfo = response
+            .get("cnCloud")
+            .ok_or_else(|| {
+                eprintln!("Response: {:#?}", &response);
+                anyhow!("`cnCloud` object is not available in the response")
+            })?
+            .get("get_info")
+            .ok_or_else(|| {
+                eprintln!("Response: {:#?}", &response);
+                anyhow!("`get_info` object in not available in the response")
+            })?;
+
+        Ok(cloudinfo.clone())
     }
 
     fn ap_list_raw(&self, refresh: bool) -> anyhow::Result<String> {
@@ -318,8 +329,8 @@ fn main() -> anyhow::Result<()> {
 fn cli() -> Command {
     Command::new("kasa-client")
         .about("TP-Link Kasa HS110 client")
-        .arg(arg!(<HOST> "Hostname or an IP address of the smartplug"))
         .arg_required_else_help(true)
+        .arg(arg!(<HOST> "Hostname or an IP address of the smartplug"))
         .arg(
             arg!(--port <NUMBER> "TCP port number")
                 .short('p')
@@ -328,7 +339,6 @@ fn cli() -> Command {
                 .default_value("9999"),
         )
         .subcommand_required(true)
-        .arg_required_else_help(true)
         .allow_external_subcommands(true)
         .subcommand(Command::new("info").about("Get smartplug system information"))
         .subcommand(Command::new("info-raw").about(
