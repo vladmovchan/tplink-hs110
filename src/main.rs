@@ -44,22 +44,23 @@ impl HS110 {
     }
 
     fn decrypt(data: &[u8]) -> anyhow::Result<String> {
-        let header_len = 4;
+        let header_len = std::mem::size_of::<u32>();
         if data.len() < header_len {
             return Err(anyhow!("Encrypted response is too short: {}", data.len()));
         }
 
         let payload_len = u32::from_be_bytes(data[..header_len].try_into()?);
         if data.len() - header_len != payload_len as usize {
-            return Err(anyhow!(
-            "Encrypted response payload size ({}), differs from the payload size specified in header ({})",
-            data.len() - header_len,
-            payload_len
-        ));
+            return Err(
+                anyhow!(
+                    "Encrypted response payload size ({}), differs from the payload size specified in header ({})",
+                    data.len() - header_len,
+                    payload_len)
+                );
         }
 
         let mut key = 171;
-        let decrypted: String = data[4..]
+        let decrypted: String = data[header_len..]
             .iter()
             .map(|byte| {
                 let plain_char = (key ^ byte) as char;
@@ -146,6 +147,9 @@ fn main() -> anyhow::Result<()> {
     let hs110 = HS110::new(format!("{hostname}:{port}"));
 
     match matches.subcommand() {
+        Some(("info-raw", _)) => {
+            println!("{}", hs110.info()?)
+        }
         Some(("info", _)) => {
             println!("{:#?}", hs110.info_deserialized()?)
         }
@@ -196,9 +200,12 @@ fn cli() -> Command {
         .arg_required_else_help(true)
         .allow_external_subcommands(true)
         .subcommand(Command::new("info").about("Get smartplug system information"))
+        .subcommand(Command::new("info-raw").about(
+            "Get smartplug system information providing the respose as it is, without parsing",
+        ))
         .subcommand(
             Command::new("led")
-                .about("Manage LED state")
+                .about("Get and manage LED state")
                 .arg(
                     arg!(--on "Turn LED on")
                         .short('1')
