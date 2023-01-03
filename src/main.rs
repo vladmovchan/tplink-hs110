@@ -21,7 +21,7 @@ use std::{
             'antitheft': '{"anti_theft":{"get_rules":{}}}',
             'reboot'   : '{"system":{"reboot":{"delay":1}}}',
             'reset'    : '{"system":{"reset":{"delay":1}}}',
-            'energy'   : '{"emeter":{"get_realtime":{}}}'
+ *          'energy'   : '{"emeter":{"get_realtime":{}}}'
 */
 
 struct HS110 {
@@ -209,6 +209,27 @@ impl HS110 {
 
         Ok(ap_list.clone())
     }
+
+    fn emeter_raw(&self) -> anyhow::Result<String> {
+        self.request(json!({"emeter":{"get_realtime":{}}}))
+    }
+
+    fn emeter_parsed(&self) -> anyhow::Result<Value> {
+        let response = serde_json::from_str::<HashMap<String, Value>>(&self.emeter_raw()?)?;
+        let emeter = response
+            .get("emeter")
+            .ok_or_else(|| {
+                eprintln!("Response: {:#?}", &response);
+                anyhow!("`emeter` object is not available in the response")
+            })?
+            .get("get_realtime")
+            .ok_or_else(|| {
+                eprintln!("Response: {:#?}", &response);
+                anyhow!("`get_realtime` object in not available in the response")
+            })?;
+
+        Ok(emeter.clone())
+    }
 }
 
 fn main() -> anyhow::Result<()> {
@@ -283,6 +304,9 @@ fn main() -> anyhow::Result<()> {
                 unreachable!()
             }
         },
+        Some(("emeter", _)) => {
+            println!("{:#?}", hs110.emeter_parsed()?)
+        }
         _ => {
             unreachable!()
         }
@@ -355,5 +379,8 @@ fn cli() -> Command {
                     Command::new("list")
                         .about("List available wifi access points without performing a scan"),
                 ),
+        )
+        .subcommand(
+            Command::new("emeter").about("Get energy meter readings (voltage, current, power)"),
         )
 }
