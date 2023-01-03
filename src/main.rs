@@ -9,8 +9,8 @@ use std::{
 
 /*
  *          'info'     : '{"system":{"get_sysinfo":{}}}',
-            'on'       : '{"system":{"set_relay_state":{"state":1}}}',
-            'off'      : '{"system":{"set_relay_state":{"state":0}}}',
+ *          'on'       : '{"system":{"set_relay_state":{"state":1}}}',
+ *          'off'      : '{"system":{"set_relay_state":{"state":0}}}',
  *          'ledoff'   : '{"system":{"set_led_off":{"off":1}}}',
  *          'ledon'    : '{"system":{"set_led_off":{"off":0}}}',
             'cloudinfo': '{"cnCloud":{"get_info":{}}}',
@@ -119,7 +119,7 @@ impl HS110 {
 
     fn set_led_state_deserialized(&self, on: bool) -> anyhow::Result<bool> {
         let response = serde_json::from_str::<HashMap<String, Value>>(&self.set_led_state(on)?)?;
-        let status = response
+        let err_code = response
             .get("system")
             .ok_or_else(|| {
                 eprintln!("Response: {:#?}", &response);
@@ -135,7 +135,55 @@ impl HS110 {
                 eprintln!("Response: {:#?}", &response);
                 anyhow!("`err_code` field in not available in the response")
             })?;
-        Ok(status == 0)
+        Ok(err_code == 0)
+    }
+
+    fn power_state(&self) -> anyhow::Result<bool> {
+        let response = self.info_deserialized()?;
+        let sysinfo = response
+            .get("system")
+            .ok_or_else(|| {
+                eprintln!("Response: {:#?}", &response);
+                anyhow!("`system` object is not available in the response")
+            })?
+            .get("get_sysinfo")
+            .ok_or_else(|| {
+                eprintln!("Response: {:#?}", &response);
+                anyhow!("`get_sysinfo` object in not available in the response")
+            })?;
+        let state = sysinfo.get("relay_state").ok_or_else(|| {
+            eprintln!("get_sysinfo: {:#?}", &sysinfo);
+            anyhow!("`relay_state` field in not available in the response")
+        })?;
+
+        Ok(state == 1)
+    }
+
+    fn set_power_state(&self, state: bool) -> anyhow::Result<String> {
+        self.request(json!({"system": {"set_relay_state": {"state": state as u8 }}}))
+    }
+
+    fn set_power_state_deserialized(&self, state: bool) -> anyhow::Result<bool> {
+        let response =
+            serde_json::from_str::<HashMap<String, Value>>(&self.set_power_state(state)?)?;
+        println!("{:#?}", response);
+        let err_code = response
+            .get("system")
+            .ok_or_else(|| {
+                eprintln!("Response: {:#?}", &response);
+                anyhow!("`system` object is not available in the response")
+            })?
+            .get("set_relay_state")
+            .ok_or_else(|| {
+                eprintln!("Response: {:#?}", &response);
+                anyhow!("`set_relay_state` object in not available in the response")
+            })?
+            .get("err_code")
+            .ok_or_else(|| {
+                eprintln!("Response: {:#?}", &response);
+                anyhow!("`err_code` field in not available in the response")
+            })?;
+        Ok(err_code == 0)
     }
 }
 
@@ -174,6 +222,28 @@ fn main() -> anyhow::Result<()> {
 
             let led = hs110.led_status()?;
             println!("LED is {}", if led { "ON" } else { "OFF" });
+        }
+        Some(("power", sub_matches)) => {
+            let switch_on = sub_matches.get_flag("on");
+            let switch_off = sub_matches.get_flag("off");
+
+            // Clap disallows to set both flags at the same time:
+            if switch_on ^ switch_off {
+                let power = hs110.power_state()?;
+                if power && switch_on || (!power && switch_off) {
+                    println!("Power is already {}", if power { "ON" } else { "OFF" });
+                    return Ok(());
+                }
+
+                let status = hs110.set_power_state_deserialized(switch_on)?;
+                println!(
+                    "Operation has {}",
+                    if status { "succeeded" } else { "failed" }
+                );
+            }
+
+            let power = hs110.power_state()?;
+            println!("Power is {}", if power { "ON" } else { "OFF" });
         }
         Some((_ext, _sub_matches)) => {
             unimplemented!()
@@ -214,6 +284,22 @@ fn cli() -> Command {
                 )
                 .arg(
                     arg!(--off "Turn LED off")
+                        .short('0')
+                        .num_args(0)
+                        .conflicts_with("on"),
+                ),
+        )
+        .subcommand(
+            Command::new("power")
+                .about("Get and manage power state")
+                .arg(
+                    arg!(--on "Turn power on")
+                        .short('1')
+                        .num_args(0)
+                        .conflicts_with("off"),
+                )
+                .arg(
+                    arg!(--off "Turn power off")
                         .short('0')
                         .num_args(0)
                         .conflicts_with("on"),
