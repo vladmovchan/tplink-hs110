@@ -1,5 +1,5 @@
 [package]
-name = "kasa-client"
+name = "tplink-hs1x0"
 version = "0.1.0"
 edition = "2021"
 
