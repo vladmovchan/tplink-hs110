@@ -12,6 +12,10 @@ pub struct HS110 {
 
 impl HS110 {
     pub fn new(addr: String) -> Self {
+        let addr = match addr.find(':') {
+            None => format!("{addr}:9999"),
+            _ => addr,
+        };
         Self { addr }
     }
 
