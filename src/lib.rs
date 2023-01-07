@@ -265,6 +265,21 @@ impl HS110 {
                 anyhow!("`get_realtime` object in not available in the response")
             })?;
 
-        Ok(emeter.clone())
+        let mut emeter = emeter.clone();
+        let fields_to_unify = vec![
+            ("voltage_mv", "voltage"),
+            ("current_ma", "current"),
+            ("power_mw", "power"),
+            ("total_wh", "total"),
+        ];
+        fields_to_unify.iter().for_each(|(field_m, field)| {
+            if let Some(value_m) = emeter.get(field_m) {
+                emeter[field] = Value::from(value_m.as_f64().unwrap_or(0f64) / 1000f64);
+            } else if let Some(value) = emeter.get(field) {
+                emeter[field_m] = Value::from((value.as_f64().unwrap_or(0f64) * 1000f64) as u64);
+            }
+        });
+
+        Ok(emeter)
     }
 }
