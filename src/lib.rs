@@ -10,6 +10,12 @@ pub struct HS110 {
     addr: String,
 }
 
+pub enum HwVersion {
+    VERSION1,
+    VERSION2,
+    UNSUPPORTED,
+}
+
 impl HS110 {
     pub fn new(addr: String) -> Self {
         let addr = match addr.find(':') {
@@ -109,6 +115,15 @@ impl HS110 {
             .as_str()
             .unwrap_or("unknown")
             .to_owned())
+    }
+
+    pub fn hw_version(&self) -> anyhow::Result<HwVersion> {
+        match self.info_field_value("hw_ver")?.as_str() {
+            Some("1.0") => Ok(HwVersion::VERSION1),
+            Some("2.0") => Ok(HwVersion::VERSION1),
+            Some(_) => Ok(HwVersion::UNSUPPORTED),
+            None => Err(anyhow!("hw_version is not available")),
+        }
     }
 
     fn set_led_state_raw(&self, on: bool) -> anyhow::Result<String> {
