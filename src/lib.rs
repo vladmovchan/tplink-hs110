@@ -103,6 +103,14 @@ impl HS110 {
         Ok(self.info_field_value("led_off")? == 0)
     }
 
+    pub fn hostname(&self) -> anyhow::Result<String> {
+        Ok(self
+            .info_field_value("alias")?
+            .as_str()
+            .unwrap_or("unknown")
+            .to_owned())
+    }
+
     fn set_led_state_raw(&self, on: bool) -> anyhow::Result<String> {
         self.request(json!({"system": {"set_led_off": {"off": !on as u8 }}}))
     }
