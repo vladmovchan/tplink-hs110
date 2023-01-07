@@ -90,15 +90,18 @@ impl HS110 {
             .get("system")
             .ok_or_else(|| {
                 eprintln!("Response: {:#?}", &response);
+                eprintln!("`system` object is not available in the response");
                 anyhow!("`system` object is not available in the response")
             })?
             .get("get_sysinfo")
             .ok_or_else(|| {
                 eprintln!("Response: {:#?}", &response);
+                eprintln!("`get_sysinfo` object in not available in the response");
                 anyhow!("`get_sysinfo` object in not available in the response")
             })?;
         let value = sysinfo.get(field).ok_or_else(|| {
             eprintln!("get_sysinfo: {:#?}", &sysinfo);
+            eprintln!("`{field}` field in not available in the response");
             anyhow!(format!("`{field}` field in not available in the response"))
         })?;
 
@@ -137,16 +140,19 @@ impl HS110 {
             .get("system")
             .ok_or_else(|| {
                 eprintln!("Response: {:#?}", &response);
+                eprintln!("`system` object is not available in the response");
                 anyhow!("`system` object is not available in the response")
             })?
             .get("set_led_off")
             .ok_or_else(|| {
                 eprintln!("Response: {:#?}", &response);
+                eprintln!("`set_led_off` object in not available in the response");
                 anyhow!("`set_led_off` object in not available in the response")
             })?
             .get("err_code")
             .ok_or_else(|| {
                 eprintln!("Response: {:#?}", &response);
+                eprintln!("`err_code` field in not available in the response");
                 anyhow!("`err_code` field in not available in the response")
             })?;
         Ok(err_code == 0)
@@ -168,16 +174,19 @@ impl HS110 {
             .get("system")
             .ok_or_else(|| {
                 eprintln!("Response: {:#?}", &response);
+                eprintln!("`system` object is not available in the response");
                 anyhow!("`system` object is not available in the response")
             })?
             .get("set_relay_state")
             .ok_or_else(|| {
                 eprintln!("Response: {:#?}", &response);
+                eprintln!("`set_relay_state` object in not available in the response");
                 anyhow!("`set_relay_state` object in not available in the response")
             })?
             .get("err_code")
             .ok_or_else(|| {
                 eprintln!("Response: {:#?}", &response);
+                eprintln!("`err_code` field in not available in the response");
                 anyhow!("`err_code` field in not available in the response")
             })?;
         Ok(err_code == 0)
@@ -193,11 +202,13 @@ impl HS110 {
             .get("cnCloud")
             .ok_or_else(|| {
                 eprintln!("Response: {:#?}", &response);
+                eprintln!("`cnCloud` object is not available in the response");
                 anyhow!("`cnCloud` object is not available in the response")
             })?
             .get("get_info")
             .ok_or_else(|| {
                 eprintln!("Response: {:#?}", &response);
+                eprintln!("`get_info` object in not available in the response");
                 anyhow!("`get_info` object in not available in the response")
             })?;
 
@@ -214,16 +225,19 @@ impl HS110 {
             .get("netif")
             .ok_or_else(|| {
                 eprintln!("Response: {:#?}", &response);
+                eprintln!("`netif` object is not available in the response");
                 anyhow!("`netif` object is not available in the response")
             })?
             .get("get_scaninfo")
             .ok_or_else(|| {
                 eprintln!("Response: {:#?}", &response);
+                eprintln!("`get_scaninfo` object in not available in the response");
                 anyhow!("`get_scaninfo` object in not available in the response")
             })?
             .get("ap_list")
             .ok_or_else(|| {
                 eprintln!("Response: {:#?}", &response);
+                eprintln!("`ap_list` field in not available in the response");
                 anyhow!("`ap_list` field in not available in the response")
             })?;
 
@@ -240,11 +254,13 @@ impl HS110 {
             .get("emeter")
             .ok_or_else(|| {
                 eprintln!("Response: {:#?}", &response);
+                eprintln!("`emeter` object is not available in the response");
                 anyhow!("`emeter` object is not available in the response")
             })?
             .get("get_realtime")
             .ok_or_else(|| {
                 eprintln!("Response: {:#?}", &response);
+                eprintln!("`get_realtime` object in not available in the response");
                 anyhow!("`get_realtime` object in not available in the response")
             })?;
 
