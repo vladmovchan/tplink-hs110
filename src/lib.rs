@@ -12,9 +12,9 @@ pub struct HS110 {
 
 #[derive(Debug)]
 pub enum HwVersion {
-    VERSION1,
-    VERSION2,
-    UNSUPPORTED,
+    Version1,
+    Version2,
+    Unsupported,
 }
 
 impl HS110 {
@@ -123,9 +123,9 @@ impl HS110 {
 
     pub fn hw_version(&self) -> anyhow::Result<HwVersion> {
         match self.info_field_value("hw_ver")?.as_str() {
-            Some("1.0") => Ok(HwVersion::VERSION1),
-            Some("2.0") => Ok(HwVersion::VERSION2),
-            Some(_) => Ok(HwVersion::UNSUPPORTED),
+            Some("1.0") => Ok(HwVersion::Version1),
+            Some("2.0") => Ok(HwVersion::Version2),
+            Some(_) => Ok(HwVersion::Unsupported),
             None => Err(anyhow!("hw_version is not available")),
         }
     }
