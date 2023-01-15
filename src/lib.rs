@@ -20,6 +20,8 @@ pub enum HwVersion {
     Unsupported,
 }
 
+const NET_BUFFER_SIZE: usize = 8192;
+
 impl HS110 {
     pub fn new(addr: String) -> Self {
         let addr = match addr.find(':') {
@@ -89,7 +91,7 @@ impl HS110 {
         };
 
         stream.write_all(&request)?;
-        let buf = &mut [0u8; 8192];
+        let buf = &mut [0u8; NET_BUFFER_SIZE];
         let nread = stream.read(buf)?;
         Self::decrypt(&buf[..nread])
     }
