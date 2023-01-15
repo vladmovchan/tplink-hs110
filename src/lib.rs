@@ -23,10 +23,10 @@ pub enum HwVersion {
 const NET_BUFFER_SIZE: usize = 8192;
 
 impl HS110 {
-    pub fn new(addr: String) -> Self {
+    pub fn new(addr: &str) -> Self {
         let addr = match addr.find(':') {
             None => format!("{addr}:9999"),
-            _ => addr,
+            _ => addr.to_owned(),
         };
         Self {
             addr,

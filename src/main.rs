@@ -23,7 +23,7 @@ fn main() -> anyhow::Result<()> {
 
     let hostname = matches.get_one::<String>("HOST").expect("required");
     let port = matches.get_one::<u16>("port").expect("defaulted in clap");
-    let hs110 = HS110::new(format!("{hostname}:{port}"));
+    let hs110 = HS110::new(&format!("{hostname}:{port}"));
 
     match matches.subcommand() {
         Some(("info-raw", _)) => {
