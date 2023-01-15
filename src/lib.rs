@@ -4,10 +4,13 @@ use std::{
     collections::HashMap,
     io::{Read, Write},
     net,
+    time::Duration,
 };
 
+#[derive(Debug)]
 pub struct HS110 {
     addr: String,
+    timeout: Option<Duration>,
 }
 
 #[derive(Debug)]
@@ -23,7 +26,15 @@ impl HS110 {
             None => format!("{addr}:9999"),
             _ => addr,
         };
-        Self { addr }
+        Self {
+            addr,
+            timeout: None,
+        }
+    }
+
+    pub fn with_timeout(mut self, duration: Duration) -> Self {
+        self.timeout = Some(duration);
+        self
     }
 
     fn encrypt(string: String) -> Vec<u8> {
@@ -67,7 +78,15 @@ impl HS110 {
 
     fn request(&self, request: Value) -> anyhow::Result<String> {
         let request = Self::encrypt(request.to_string());
-        let mut stream = net::TcpStream::connect(self.addr.clone())?;
+        let mut stream = match self.timeout {
+            None => net::TcpStream::connect(&self.addr)?,
+            Some(duration) => {
+                let stream = net::TcpStream::connect_timeout(&self.addr.parse()?, duration)?;
+                stream.set_read_timeout(self.timeout)?;
+                stream.set_write_timeout(self.timeout)?;
+                stream
+            }
+        };
 
         stream.write_all(&request)?;
         let buf = &mut [0u8; 8192];
