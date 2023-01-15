@@ -39,14 +39,15 @@ impl HS110 {
         self
     }
 
-    fn encrypt(string: String) -> Vec<u8> {
+    fn encrypt(request: Value) -> Vec<u8> {
+        let request = request.to_string();
         let mut key = 171;
-        let mut result = (string.len() as u32).to_be_bytes().to_vec();
-        for b in string.into_bytes() {
+        let mut encrypted = (request.len() as u32).to_be_bytes().to_vec();
+        for b in request.into_bytes() {
             key ^= b;
-            result.push(key);
+            encrypted.push(key);
         }
-        result
+        encrypted
     }
 
     fn decrypt(data: &[u8]) -> anyhow::Result<String> {
@@ -79,7 +80,7 @@ impl HS110 {
     }
 
     fn request(&self, request: Value) -> anyhow::Result<String> {
-        let request = Self::encrypt(request.to_string());
+        let encrypted = Self::encrypt(request);
         let mut stream = match self.timeout {
             None => net::TcpStream::connect(&self.addr)?,
             Some(duration) => {
@@ -90,7 +91,7 @@ impl HS110 {
             }
         };
 
-        stream.write_all(&request)?;
+        stream.write_all(&encrypted)?;
         let buf = &mut [0u8; NET_BUFFER_SIZE];
         let nread = stream.read(buf)?;
         Self::decrypt(&buf[..nread])
