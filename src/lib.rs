@@ -90,9 +90,18 @@ impl HS110 {
         };
 
         stream.write_all(&encrypted)?;
-        let buf = &mut [0u8; NET_BUFFER_SIZE];
-        let nread = stream.read(buf)?;
-        Self::decrypt(&buf[..nread])
+        stream.flush()?;
+
+        let mut received = vec![];
+        let mut rx_bytes = [0u8; NET_BUFFER_SIZE];
+        loop {
+            let nread = stream.read(&mut rx_bytes)?;
+            received.extend_from_slice(&rx_bytes[..nread]);
+            if nread < NET_BUFFER_SIZE {
+                break;
+            }
+        }
+        Self::decrypt(&received)
     }
 
     pub fn info_raw(&self) -> anyhow::Result<String> {
