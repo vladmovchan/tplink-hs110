@@ -1,7 +1,6 @@
 use anyhow::anyhow;
 use serde_json::{json, Value};
 use std::{
-    collections::HashMap,
     io::{Read, Write},
     net,
     time::Duration,
@@ -60,9 +59,8 @@ impl HS110 {
         if data.len() - header_len != payload_len as usize {
             return Err(
                 anyhow!(
-                    "Encrypted response payload size ({}), differs from the payload size specified in header ({})",
-                    data.len() - header_len,
-                    payload_len)
+                    "Encrypted response payload size ({}), differs from the payload size specified in header ({payload_len})",
+                    data.len() - header_len)
                 );
         }
 
@@ -101,34 +99,15 @@ impl HS110 {
         self.request(&json!({"system": {"get_sysinfo": {}}}))
     }
 
-    pub fn info_parsed(&self) -> anyhow::Result<HashMap<String, Value>> {
-        Ok(serde_json::from_str::<HashMap<String, Value>>(
-            &self.info_raw()?,
-        )?)
+    pub fn info_parsed(&self) -> anyhow::Result<Value> {
+        Ok(serde_json::from_str::<Value>(&self.info_raw()?)?)
     }
 
     fn info_field_value(&self, field: &str) -> anyhow::Result<Value> {
         let response = self.info_parsed()?;
-        let sysinfo = response
-            .get("system")
-            .ok_or_else(|| {
-                eprintln!("Response: {:#?}", &response);
-                eprintln!("`system` object is not available in the response");
-                anyhow!("`system` object is not available in the response")
-            })?
-            .get("get_sysinfo")
-            .ok_or_else(|| {
-                eprintln!("Response: {:#?}", &response);
-                eprintln!("`get_sysinfo` object in not available in the response");
-                anyhow!("`get_sysinfo` object in not available in the response")
-            })?;
-        let value = sysinfo.get(field).ok_or_else(|| {
-            eprintln!("get_sysinfo: {:#?}", &sysinfo);
-            eprintln!("`{field}` field in not available in the response");
-            anyhow!(format!("`{field}` field in not available in the response"))
-        })?;
+        let value = extract_hierarchical(&response, &["system", "get_sysinfo", field])?;
 
-        Ok(value.clone())
+        Ok(value)
     }
 
     pub fn led_status(&self) -> anyhow::Result<bool> {
@@ -157,27 +136,10 @@ impl HS110 {
     }
 
     pub fn set_led_state_parsed(&self, on: bool) -> anyhow::Result<bool> {
-        let response =
-            serde_json::from_str::<HashMap<String, Value>>(&self.set_led_state_raw(on)?)?;
-        let err_code = response
-            .get("system")
-            .ok_or_else(|| {
-                eprintln!("Response: {:#?}", &response);
-                eprintln!("`system` object is not available in the response");
-                anyhow!("`system` object is not available in the response")
-            })?
-            .get("set_led_off")
-            .ok_or_else(|| {
-                eprintln!("Response: {:#?}", &response);
-                eprintln!("`set_led_off` object in not available in the response");
-                anyhow!("`set_led_off` object in not available in the response")
-            })?
-            .get("err_code")
-            .ok_or_else(|| {
-                eprintln!("Response: {:#?}", &response);
-                eprintln!("`err_code` field in not available in the response");
-                anyhow!("`err_code` field in not available in the response")
-            })?;
+        let response = serde_json::from_str::<Value>(&self.set_led_state_raw(on)?)?;
+
+        let err_code = extract_hierarchical(&response, &["system", "set_led_off", "err_code"])?;
+
         Ok(err_code == 0)
     }
 
@@ -190,28 +152,9 @@ impl HS110 {
     }
 
     pub fn set_power_state_parsed(&self, state: bool) -> anyhow::Result<bool> {
-        let response =
-            serde_json::from_str::<HashMap<String, Value>>(&self.set_power_state_raw(state)?)?;
-        println!("{:#?}", response);
-        let err_code = response
-            .get("system")
-            .ok_or_else(|| {
-                eprintln!("Response: {:#?}", &response);
-                eprintln!("`system` object is not available in the response");
-                anyhow!("`system` object is not available in the response")
-            })?
-            .get("set_relay_state")
-            .ok_or_else(|| {
-                eprintln!("Response: {:#?}", &response);
-                eprintln!("`set_relay_state` object in not available in the response");
-                anyhow!("`set_relay_state` object in not available in the response")
-            })?
-            .get("err_code")
-            .ok_or_else(|| {
-                eprintln!("Response: {:#?}", &response);
-                eprintln!("`err_code` field in not available in the response");
-                anyhow!("`err_code` field in not available in the response")
-            })?;
+        let response = serde_json::from_str::<Value>(&self.set_power_state_raw(state)?)?;
+        let err_code = extract_hierarchical(&response, &["system", "set_relay_state", "err_code"])?;
+
         Ok(err_code == 0)
     }
 
@@ -220,22 +163,10 @@ impl HS110 {
     }
 
     pub fn cloudinfo_parsed(&self) -> anyhow::Result<Value> {
-        let response = serde_json::from_str::<HashMap<String, Value>>(&self.cloudinfo_raw()?)?;
-        let cloudinfo = response
-            .get("cnCloud")
-            .ok_or_else(|| {
-                eprintln!("Response: {:#?}", &response);
-                eprintln!("`cnCloud` object is not available in the response");
-                anyhow!("`cnCloud` object is not available in the response")
-            })?
-            .get("get_info")
-            .ok_or_else(|| {
-                eprintln!("Response: {:#?}", &response);
-                eprintln!("`get_info` object in not available in the response");
-                anyhow!("`get_info` object in not available in the response")
-            })?;
+        let response = serde_json::from_str::<Value>(&self.cloudinfo_raw()?)?;
+        let cloudinfo = extract_hierarchical(&response, &["cnCloud", "get_info"])?;
 
-        Ok(cloudinfo.clone())
+        Ok(cloudinfo)
     }
 
     fn ap_list_raw(&self, refresh: bool) -> anyhow::Result<String> {
@@ -243,28 +174,10 @@ impl HS110 {
     }
 
     pub fn ap_list_parsed(&self, refresh: bool) -> anyhow::Result<Value> {
-        let response = serde_json::from_str::<HashMap<String, Value>>(&self.ap_list_raw(refresh)?)?;
-        let ap_list = response
-            .get("netif")
-            .ok_or_else(|| {
-                eprintln!("Response: {:#?}", &response);
-                eprintln!("`netif` object is not available in the response");
-                anyhow!("`netif` object is not available in the response")
-            })?
-            .get("get_scaninfo")
-            .ok_or_else(|| {
-                eprintln!("Response: {:#?}", &response);
-                eprintln!("`get_scaninfo` object in not available in the response");
-                anyhow!("`get_scaninfo` object in not available in the response")
-            })?
-            .get("ap_list")
-            .ok_or_else(|| {
-                eprintln!("Response: {:#?}", &response);
-                eprintln!("`ap_list` field in not available in the response");
-                anyhow!("`ap_list` field in not available in the response")
-            })?;
+        let response = serde_json::from_str::<Value>(&self.ap_list_raw(refresh)?)?;
+        let ap_list = extract_hierarchical(&response, &["netif", "get_scaninfo", "ap_list"])?;
 
-        Ok(ap_list.clone())
+        Ok(ap_list)
     }
 
     fn emeter_raw(&self) -> anyhow::Result<String> {
@@ -272,22 +185,9 @@ impl HS110 {
     }
 
     pub fn emeter_parsed(&self) -> anyhow::Result<Value> {
-        let response = serde_json::from_str::<HashMap<String, Value>>(&self.emeter_raw()?)?;
-        let emeter = response
-            .get("emeter")
-            .ok_or_else(|| {
-                eprintln!("Response: {:#?}", &response);
-                eprintln!("`emeter` object is not available in the response");
-                anyhow!("`emeter` object is not available in the response")
-            })?
-            .get("get_realtime")
-            .ok_or_else(|| {
-                eprintln!("Response: {:#?}", &response);
-                eprintln!("`get_realtime` object in not available in the response");
-                anyhow!("`get_realtime` object in not available in the response")
-            })?;
+        let response = serde_json::from_str::<Value>(&self.emeter_raw()?)?;
+        let mut emeter = extract_hierarchical(&response, &["emeter", "get_realtime"])?;
 
-        let mut emeter = emeter.clone();
         let fields_to_unify = vec![
             ("voltage_mv", "voltage"),
             ("current_ma", "current"),
@@ -304,4 +204,17 @@ impl HS110 {
 
         Ok(emeter)
     }
+}
+
+fn extract_hierarchical(response: &Value, path: &[&str]) -> anyhow::Result<Value> {
+    let mut value = response;
+    for next_prefix in path {
+        value = value.get(next_prefix).ok_or_else(|| {
+            eprintln!("Response: {response:#?}");
+            eprintln!("`{next_prefix}` key is not available in the response");
+            anyhow!("`{next_prefix}` key is not available in the response")
+        })?;
+    }
+
+    Ok(value.clone())
 }
