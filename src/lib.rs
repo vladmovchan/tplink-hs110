@@ -93,10 +93,10 @@ impl HS110 {
         stream.flush()?;
 
         let mut received = vec![];
-        let mut rx_bytes = [0u8; NET_BUFFER_SIZE];
+        let mut rx_buf = [0u8; NET_BUFFER_SIZE];
         loop {
-            let nread = stream.read(&mut rx_bytes)?;
-            received.extend_from_slice(&rx_bytes[..nread]);
+            let nread = stream.read(&mut rx_buf)?;
+            received.extend_from_slice(&rx_buf[..nread]);
             if nread < NET_BUFFER_SIZE {
                 break;
             }
@@ -146,7 +146,6 @@ impl HS110 {
 
     pub fn set_led_state_parsed(&self, on: bool) -> anyhow::Result<bool> {
         let response = serde_json::from_str::<Value>(&self.set_led_state_raw(on)?)?;
-
         let err_code = extract_hierarchical(&response, &["system", "set_led_off", "err_code"])?;
 
         Ok(err_code == 0)
@@ -197,17 +196,27 @@ impl HS110 {
         let response = serde_json::from_str::<Value>(&self.emeter_raw()?)?;
         let mut emeter = extract_hierarchical(&response, &["emeter", "get_realtime"])?;
 
-        let fields_to_unify = vec![
-            ("voltage_mv", "voltage"),
-            ("current_ma", "current"),
-            ("power_mw", "power"),
-            ("total_wh", "total"),
-        ];
-        fields_to_unify.iter().for_each(|(field_m, field)| {
-            if let Some(value_m) = emeter.get(field_m) {
-                emeter[field] = Value::from(value_m.as_f64().unwrap_or(0f64) / 1000f64);
-            } else if let Some(value) = emeter.get(field) {
-                emeter[field_m] = Value::from((value.as_f64().unwrap_or(0f64) * 1000f64) as u64);
+        // Smart plugs of HW version 1 and HW version 2 provide results via different json fields and use different units.
+        // I.e. one uses "voltage" in Volts and another "voltage_mv" in milliVolts.
+        // As it is hard to decide which version is "better" or more widely used - calculate and provide both fields
+        // for both hardware versions:
+        #[rustfmt::skip]
+        [
+            ("voltage_mv", "voltage",    1000f64),
+            ("current_ma", "current",    1000f64),
+            ("power_mw",   "power",      1000f64),
+            ("total_wh",   "total",      1000f64),
+            ("voltage",    "voltage_mv", 0.001f64),
+            ("current",    "current_ma", 0.001f64),
+            ("power",      "power_mw",   0.001f64),
+            ("total",      "total_wh",   0.001f64),
+        ]
+        .iter()
+        .for_each(|(from, to, divider)| {
+            if let Some(from) = emeter.get(from) {
+                if emeter.get(to).is_none() {
+                    emeter[to] = Value::from(from.as_f64().unwrap_or(0f64) / divider);
+                }
             }
         });
 
