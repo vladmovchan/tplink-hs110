@@ -39,11 +39,11 @@ impl HS110 {
         self
     }
 
-    fn encrypt(request: Value) -> Vec<u8> {
+    fn encrypt(request: &Value) -> Vec<u8> {
         let request = request.to_string();
         let mut key = 171;
         let mut encrypted = (request.len() as u32).to_be_bytes().to_vec();
-        for b in request.into_bytes() {
+        for b in request.as_bytes() {
             key ^= b;
             encrypted.push(key);
         }
@@ -79,7 +79,7 @@ impl HS110 {
         Ok(decrypted)
     }
 
-    fn request(&self, request: Value) -> anyhow::Result<String> {
+    fn request(&self, request: &Value) -> anyhow::Result<String> {
         let encrypted = Self::encrypt(request);
         let mut stream = match self.timeout {
             None => net::TcpStream::connect(&self.addr)?,
@@ -98,7 +98,7 @@ impl HS110 {
     }
 
     pub fn info_raw(&self) -> anyhow::Result<String> {
-        self.request(json!({"system": {"get_sysinfo": {}}}))
+        self.request(&json!({"system": {"get_sysinfo": {}}}))
     }
 
     pub fn info_parsed(&self) -> anyhow::Result<HashMap<String, Value>> {
@@ -153,7 +153,7 @@ impl HS110 {
     }
 
     fn set_led_state_raw(&self, on: bool) -> anyhow::Result<String> {
-        self.request(json!({"system": {"set_led_off": {"off": !on as u8 }}}))
+        self.request(&json!({"system": {"set_led_off": {"off": !on as u8 }}}))
     }
 
     pub fn set_led_state_parsed(&self, on: bool) -> anyhow::Result<bool> {
@@ -186,7 +186,7 @@ impl HS110 {
     }
 
     fn set_power_state_raw(&self, state: bool) -> anyhow::Result<String> {
-        self.request(json!({"system": {"set_relay_state": {"state": state as u8 }}}))
+        self.request(&json!({"system": {"set_relay_state": {"state": state as u8 }}}))
     }
 
     pub fn set_power_state_parsed(&self, state: bool) -> anyhow::Result<bool> {
@@ -216,7 +216,7 @@ impl HS110 {
     }
 
     fn cloudinfo_raw(&self) -> anyhow::Result<String> {
-        self.request(json!({"cnCloud": {"get_info": {}}}))
+        self.request(&json!({"cnCloud": {"get_info": {}}}))
     }
 
     pub fn cloudinfo_parsed(&self) -> anyhow::Result<Value> {
@@ -239,7 +239,7 @@ impl HS110 {
     }
 
     fn ap_list_raw(&self, refresh: bool) -> anyhow::Result<String> {
-        self.request(json!({"netif": {"get_scaninfo": {"refresh": refresh as u8}}}))
+        self.request(&json!({"netif": {"get_scaninfo": {"refresh": refresh as u8}}}))
     }
 
     pub fn ap_list_parsed(&self, refresh: bool) -> anyhow::Result<Value> {
@@ -268,7 +268,7 @@ impl HS110 {
     }
 
     fn emeter_raw(&self) -> anyhow::Result<String> {
-        self.request(json!({"emeter":{"get_realtime":{}}}))
+        self.request(&json!({"emeter":{"get_realtime":{}}}))
     }
 
     pub fn emeter_parsed(&self) -> anyhow::Result<Value> {
