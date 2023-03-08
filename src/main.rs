@@ -27,9 +27,6 @@ fn main() -> anyhow::Result<()> {
     let hs110 = HS110::new(&format!("{hostname}:{port}"));
 
     match matches.subcommand() {
-        Some(("info-raw", _)) => {
-            println!("{}", hs110.info_raw()?)
-        }
         Some(("info", _)) => {
             println!("{}", to_string_pretty(&hs110.info_parsed()?)?)
         }
@@ -123,9 +120,6 @@ fn cli() -> Command {
         .subcommand_required(true)
         .allow_external_subcommands(true)
         .subcommand(Command::new("info").about("Get smartplug system information"))
-        .subcommand(Command::new("info-raw").about(
-            "Get smartplug system information providing the response as it is, without parsing",
-        ))
         .subcommand(
             Command::new("led")
                 .about("Get and manage LED state")
