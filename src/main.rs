@@ -1,6 +1,6 @@
 use clap::{arg, Command};
 use serde_json::to_string_pretty;
-use tplink_hs1x0::HS110;
+use tplink_hs110::HS110;
 
 fn main() -> anyhow::Result<()> {
     let matches = cli().get_matches();
@@ -89,7 +89,7 @@ fn main() -> anyhow::Result<()> {
 }
 
 fn cli() -> Command {
-    Command::new("tplink-hs1x0")
+    Command::new("tplink-hs110")
         .about("TP-Link Kasa HS110 client")
         .arg_required_else_help(true)
         .arg(arg!(<HOST> "Hostname or an IP address of the smartplug"))

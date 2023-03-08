@@ -1,5 +1,5 @@
 [package]
-name = "tplink-hs1x0"
+name = "tplink-hs110"
 version = "0.1.0"
 edition = "2021"
 
