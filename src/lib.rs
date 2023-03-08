@@ -247,3 +247,98 @@ fn extract_hierarchical(response: &Value, path: &[&str]) -> anyhow::Result<Value
 
     Ok(value.clone())
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::*;
+    use once_cell::sync::Lazy;
+    use serial_test::serial;
+
+    static TEST_TARGET_ADDR: Lazy<String> =
+        Lazy::new(|| std::env::var("TEST_TARGET_ADDR").expect("TEST_TARGET_ADDR env variable"));
+
+    #[test]
+    #[serial]
+    fn basic() {
+        let hs110 = HS110::new(&*TEST_TARGET_ADDR).with_timeout(Duration::from_secs(3));
+        assert_ne!("unknown", hs110.hostname().unwrap());
+
+        let hs110 = HS110::new(&*TEST_TARGET_ADDR);
+        assert_ne!("unknown", hs110.hostname().unwrap());
+
+        assert!(matches!(
+            hs110.hw_version(),
+            Ok(HwVersion::Version1) | Ok(HwVersion::Version2)
+        ));
+    }
+
+    #[test]
+    fn led_on_off() {
+        let hs110 = HS110::new(&*TEST_TARGET_ADDR);
+
+        let original_state = hs110.led_status().unwrap();
+        assert!(hs110.set_led_state_parsed(!original_state).is_ok());
+        assert_eq!(hs110.led_status().unwrap(), !original_state);
+        assert!(hs110.set_led_state_parsed(original_state).is_ok());
+        assert_eq!(hs110.led_status().unwrap(), original_state);
+    }
+
+    #[test]
+    #[serial]
+    #[ignore] // Power-cycles devices connected to the plug
+    fn power_on_off() {
+        let hs110 = HS110::new(&*TEST_TARGET_ADDR);
+
+        let original_state = hs110.power_state().unwrap();
+        assert!(hs110.set_power_state_parsed(!original_state).is_ok());
+        assert_eq!(hs110.power_state().unwrap(), !original_state);
+        assert!(hs110.set_power_state_parsed(original_state).is_ok());
+        assert_eq!(hs110.power_state().unwrap(), original_state);
+    }
+
+    #[test]
+    fn cloudinfo() {
+        let hs110 = HS110::new(&*TEST_TARGET_ADDR);
+
+        assert!(hs110.cloudinfo_parsed().is_ok());
+    }
+
+    #[test]
+    #[serial]
+    fn ap_list_scan() {
+        let hs110 = HS110::new(&*TEST_TARGET_ADDR);
+
+        hs110
+            .ap_list_parsed(false)
+            .unwrap()
+            .as_array()
+            .expect("json array");
+        assert!(!hs110
+            .ap_list_parsed(true)
+            .unwrap()
+            .as_array()
+            .expect("json array")
+            .is_empty());
+    }
+
+    #[test]
+    #[serial]
+    #[ignore] // Power-cycles devices connected to the plug
+    fn reboot() {
+        let hs110 = HS110::new(&*TEST_TARGET_ADDR);
+        assert_eq!(hs110.reboot_parsed(None).unwrap(), true);
+
+        let hs110 = HS110::new(&*TEST_TARGET_ADDR).with_timeout(Duration::from_secs(1));
+        // Device is expected to be unreachable after the previous reboot
+        assert!(hs110.reboot_parsed(Some(1)).is_err());
+
+        // Wait till device is back online before the end of the test
+        for _ in 0..20 {
+            let hs110 = HS110::new(&*TEST_TARGET_ADDR).with_timeout(Duration::from_secs(10));
+            if hs110.hostname().is_ok() {
+                return;
+            }
+        }
+        panic!("Device didn't back online after reboot");
+    }
+}
