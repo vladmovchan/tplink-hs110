@@ -104,16 +104,14 @@ impl HS110 {
         Self::decrypt(&received)
     }
 
-    pub fn info_raw(&self) -> anyhow::Result<String> {
-        self.request(&json!({"system": {"get_sysinfo": {}}}))
-    }
-
-    pub fn info_parsed(&self) -> anyhow::Result<Value> {
-        Ok(serde_json::from_str::<Value>(&self.info_raw()?)?)
+    pub fn info(&self) -> anyhow::Result<Value> {
+        Ok(serde_json::from_str::<Value>(
+            &self.request(&json!({"system": {"get_sysinfo": {}}}))?,
+        )?)
     }
 
     fn info_field_value(&self, field: &str) -> anyhow::Result<Value> {
-        let response = self.info_parsed()?;
+        let response = self.info()?;
         let value = extract_hierarchical(&response, &["system", "get_sysinfo", field])?;
 
         Ok(value)
@@ -140,12 +138,10 @@ impl HS110 {
         }
     }
 
-    fn set_led_state_raw(&self, on: bool) -> anyhow::Result<String> {
-        self.request(&json!({"system": {"set_led_off": {"off": !on as u8 }}}))
-    }
-
-    pub fn set_led_state_parsed(&self, on: bool) -> anyhow::Result<bool> {
-        let response = serde_json::from_str::<Value>(&self.set_led_state_raw(on)?)?;
+    pub fn set_led_state(&self, on: bool) -> anyhow::Result<bool> {
+        let response = serde_json::from_str::<Value>(
+            &self.request(&json!({"system": {"set_led_off": {"off": !on as u8 }}}))?,
+        )?;
         let err_code = extract_hierarchical(&response, &["system", "set_led_off", "err_code"])?;
 
         Ok(err_code == 0)
@@ -155,45 +151,35 @@ impl HS110 {
         Ok(self.info_field_value("relay_state")? == 1)
     }
 
-    fn set_power_state_raw(&self, state: bool) -> anyhow::Result<String> {
-        self.request(&json!({"system": {"set_relay_state": {"state": state as u8 }}}))
-    }
-
-    pub fn set_power_state_parsed(&self, state: bool) -> anyhow::Result<bool> {
-        let response = serde_json::from_str::<Value>(&self.set_power_state_raw(state)?)?;
+    pub fn set_power_state(&self, state: bool) -> anyhow::Result<bool> {
+        let response = serde_json::from_str::<Value>(
+            &self.request(&json!({"system": {"set_relay_state": {"state": state as u8 }}}))?,
+        )?;
         let err_code = extract_hierarchical(&response, &["system", "set_relay_state", "err_code"])?;
 
         Ok(err_code == 0)
     }
 
-    fn cloudinfo_raw(&self) -> anyhow::Result<String> {
-        self.request(&json!({"cnCloud": {"get_info": {}}}))
-    }
-
-    pub fn cloudinfo_parsed(&self) -> anyhow::Result<Value> {
-        let response = serde_json::from_str::<Value>(&self.cloudinfo_raw()?)?;
+    pub fn cloudinfo(&self) -> anyhow::Result<Value> {
+        let response =
+            serde_json::from_str::<Value>(&self.request(&json!({"cnCloud": {"get_info": {}}}))?)?;
         let cloudinfo = extract_hierarchical(&response, &["cnCloud", "get_info"])?;
 
         Ok(cloudinfo)
     }
 
-    fn ap_list_raw(&self, refresh: bool) -> anyhow::Result<String> {
-        self.request(&json!({"netif": {"get_scaninfo": {"refresh": refresh as u8}}}))
-    }
-
-    pub fn ap_list_parsed(&self, refresh: bool) -> anyhow::Result<Value> {
-        let response = serde_json::from_str::<Value>(&self.ap_list_raw(refresh)?)?;
+    pub fn ap_list(&self, refresh: bool) -> anyhow::Result<Value> {
+        let response = serde_json::from_str::<Value>(
+            &self.request(&json!({"netif": {"get_scaninfo": {"refresh": refresh as u8}}}))?,
+        )?;
         let ap_list = extract_hierarchical(&response, &["netif", "get_scaninfo", "ap_list"])?;
 
         Ok(ap_list)
     }
 
-    fn emeter_raw(&self) -> anyhow::Result<String> {
-        self.request(&json!({"emeter":{"get_realtime":{}}}))
-    }
-
-    pub fn emeter_parsed(&self) -> anyhow::Result<Value> {
-        let response = serde_json::from_str::<Value>(&self.emeter_raw()?)?;
+    pub fn emeter(&self) -> anyhow::Result<Value> {
+        let response =
+            serde_json::from_str::<Value>(&self.request(&json!({"emeter":{"get_realtime":{}}}))?)?;
         let mut emeter = extract_hierarchical(&response, &["emeter", "get_realtime"])?;
 
         // Smart plugs of HW version 1 and HW version 2 provide results via different json fields and use different units.
@@ -223,23 +209,19 @@ impl HS110 {
         Ok(emeter)
     }
 
-    fn reboot_raw(&self, delay: Option<u32>) -> anyhow::Result<String> {
-        self.request(&json!({"system": {"reboot": {"delay": delay.unwrap_or(0) }}}))
-    }
-
-    pub fn reboot_parsed(&self, delay: Option<u32>) -> anyhow::Result<bool> {
-        let response = serde_json::from_str::<Value>(&self.reboot_raw(delay)?)?;
+    pub fn reboot(&self, delay: Option<u32>) -> anyhow::Result<bool> {
+        let response = serde_json::from_str::<Value>(
+            &self.request(&json!({"system": {"reboot": {"delay": delay.unwrap_or(0) }}}))?,
+        )?;
         let err_code = extract_hierarchical(&response, &["system", "reboot", "err_code"])?;
 
         Ok(err_code == 0)
     }
 
-    fn factory_reset_raw(&self, delay: Option<u32>) -> anyhow::Result<String> {
-        self.request(&json!({"system": {"reset": {"delay": delay.unwrap_or(0) }}}))
-    }
-
-    pub fn factory_reset_parsed(&self, delay: Option<u32>) -> anyhow::Result<bool> {
-        let response = serde_json::from_str::<Value>(&self.factory_reset_raw(delay)?)?;
+    pub fn factory_reset(&self, delay: Option<u32>) -> anyhow::Result<bool> {
+        let response = serde_json::from_str::<Value>(
+            &self.request(&json!({"system": {"reset": {"delay": delay.unwrap_or(0) }}}))?,
+        )?;
         let err_code = extract_hierarchical(&response, &["system", "reset", "err_code"])?;
 
         Ok(err_code == 0)
@@ -288,9 +270,9 @@ mod tests {
         let hs110 = HS110::new(&*TEST_TARGET_ADDR);
 
         let original_state = hs110.led_status().unwrap();
-        assert!(hs110.set_led_state_parsed(!original_state).is_ok());
+        assert!(hs110.set_led_state(!original_state).is_ok());
         assert_eq!(hs110.led_status().unwrap(), !original_state);
-        assert!(hs110.set_led_state_parsed(original_state).is_ok());
+        assert!(hs110.set_led_state(original_state).is_ok());
         assert_eq!(hs110.led_status().unwrap(), original_state);
     }
 
@@ -301,9 +283,9 @@ mod tests {
         let hs110 = HS110::new(&*TEST_TARGET_ADDR);
 
         let original_state = hs110.power_state().unwrap();
-        assert!(hs110.set_power_state_parsed(!original_state).is_ok());
+        assert!(hs110.set_power_state(!original_state).is_ok());
         assert_eq!(hs110.power_state().unwrap(), !original_state);
-        assert!(hs110.set_power_state_parsed(original_state).is_ok());
+        assert!(hs110.set_power_state(original_state).is_ok());
         assert_eq!(hs110.power_state().unwrap(), original_state);
     }
 
@@ -311,7 +293,7 @@ mod tests {
     fn cloudinfo() {
         let hs110 = HS110::new(&*TEST_TARGET_ADDR);
 
-        assert!(hs110.cloudinfo_parsed().is_ok());
+        assert!(hs110.cloudinfo().is_ok());
     }
 
     #[test]
@@ -320,12 +302,12 @@ mod tests {
         let hs110 = HS110::new(&*TEST_TARGET_ADDR);
 
         hs110
-            .ap_list_parsed(false)
+            .ap_list(false)
             .unwrap()
             .as_array()
             .expect("json array");
         assert!(!hs110
-            .ap_list_parsed(true)
+            .ap_list(true)
             .unwrap()
             .as_array()
             .expect("json array")
@@ -337,11 +319,11 @@ mod tests {
     #[ignore] // Power-cycles devices connected to the plug
     fn reboot() {
         let hs110 = HS110::new(&*TEST_TARGET_ADDR);
-        assert_eq!(hs110.reboot_parsed(None).unwrap(), true);
+        assert_eq!(hs110.reboot(None).unwrap(), true);
 
         let hs110 = HS110::new(&*TEST_TARGET_ADDR).with_timeout(Duration::from_secs(1));
         // Device is expected to be unreachable after the previous reboot
-        assert!(hs110.reboot_parsed(Some(1)).is_err());
+        assert!(hs110.reboot(Some(1)).is_err());
 
         // Wait till device is back online before the end of the test
         for _ in 0..20 {

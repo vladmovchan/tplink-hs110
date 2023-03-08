@@ -2,23 +2,6 @@ use clap::{arg, Command};
 use serde_json::to_string_pretty;
 use tplink_hs1x0::HS110;
 
-/*
- *          'info'     : '{"system":{"get_sysinfo":{}}}',
- *          'on'       : '{"system":{"set_relay_state":{"state":1}}}',
- *          'off'      : '{"system":{"set_relay_state":{"state":0}}}',
- *          'ledoff'   : '{"system":{"set_led_off":{"off":1}}}',
- *          'ledon'    : '{"system":{"set_led_off":{"off":0}}}',
- *          'cloudinfo': '{"cnCloud":{"get_info":{}}}',
- *          'wlanscan' : '{"netif":{"get_scaninfo":{"refresh":0}}}',
-            'time'     : '{"time":{"get_time":{}}}',
-            'schedule' : '{"schedule":{"get_rules":{}}}',
-            'countdown': '{"count_down":{"get_rules":{}}}',
-            'antitheft': '{"anti_theft":{"get_rules":{}}}',
- *          'reboot'   : '{"system":{"reboot":{"delay":1}}}',
- *          'reset'    : '{"system":{"reset":{"delay":1}}}',
- *          'energy'   : '{"emeter":{"get_realtime":{}}}'
-*/
-
 fn main() -> anyhow::Result<()> {
     let matches = cli().get_matches();
 
@@ -28,7 +11,7 @@ fn main() -> anyhow::Result<()> {
 
     match matches.subcommand() {
         Some(("info", _)) => {
-            println!("{}", to_string_pretty(&hs110.info_parsed()?)?)
+            println!("{}", to_string_pretty(&hs110.info()?)?)
         }
         Some(("led", sub_matches)) => {
             let switch_on = sub_matches.get_flag("on");
@@ -42,8 +25,8 @@ fn main() -> anyhow::Result<()> {
                     return Ok(());
                 }
 
-                let status = hs110.set_led_state_parsed(switch_on)?;
-                print_status(status);
+                let status = hs110.set_led_state(switch_on)?;
+                print_op_status(status);
             }
 
             let led = hs110.led_status()?;
@@ -61,41 +44,41 @@ fn main() -> anyhow::Result<()> {
                     return Ok(());
                 }
 
-                let status = hs110.set_power_state_parsed(switch_on)?;
-                print_status(status);
+                let status = hs110.set_power_state(switch_on)?;
+                print_op_status(status);
             }
 
             let power = hs110.power_state()?;
             println!("Power is {}", if power { "ON" } else { "OFF" });
         }
         Some(("cloudinfo", _)) => {
-            println!("{}", to_string_pretty(&hs110.cloudinfo_parsed()?)?)
+            println!("{}", to_string_pretty(&hs110.cloudinfo()?)?)
         }
         Some(("wifi", sub_matches)) => match sub_matches.subcommand() {
             Some(("scan", _)) => {
-                println!("{}", to_string_pretty(&hs110.ap_list_parsed(true)?)?);
+                println!("{}", to_string_pretty(&hs110.ap_list(true)?)?);
             }
             Some(("list", _)) => {
-                println!("{}", to_string_pretty(&hs110.ap_list_parsed(false)?)?)
+                println!("{}", to_string_pretty(&hs110.ap_list(false)?)?)
             }
             _ => {
                 unreachable!()
             }
         },
         Some(("emeter", _)) => {
-            println!("{}", to_string_pretty(&hs110.emeter_parsed()?)?)
+            println!("{}", to_string_pretty(&hs110.emeter()?)?)
         }
         Some(("reboot", sub_matches)) => {
-            let delay = sub_matches.get_one::<u32>("delay").map(|v| *v);
+            let delay = sub_matches.get_one::<u32>("delay").copied();
 
-            let status = hs110.reboot_parsed(delay)?;
-            print_status(status);
+            let status = hs110.reboot(delay)?;
+            print_op_status(status);
         }
         Some(("factory-reset", sub_matches)) => {
-            let delay = sub_matches.get_one::<u32>("delay").map(|v| *v);
+            let delay = sub_matches.get_one::<u32>("delay").copied();
 
-            let status = hs110.factory_reset_parsed(delay)?;
-            print_status(status);
+            let status = hs110.factory_reset(delay)?;
+            print_op_status(status);
         }
         _ => {
             unreachable!()
@@ -191,7 +174,7 @@ fn cli() -> Command {
         )
 }
 
-fn print_status(status: bool) {
+fn print_op_status(status: bool) {
     println!(
         "Operation has {}",
         if status { "succeeded" } else { "failed" }
