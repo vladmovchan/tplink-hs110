@@ -233,6 +233,17 @@ impl HS110 {
 
         Ok(err_code == 0)
     }
+
+    fn factory_reset_raw(&self, delay: Option<u32>) -> anyhow::Result<String> {
+        self.request(&json!({"system": {"reset": {"delay": delay.unwrap_or(0) }}}))
+    }
+
+    pub fn factory_reset_parsed(&self, delay: Option<u32>) -> anyhow::Result<bool> {
+        let response = serde_json::from_str::<Value>(&self.factory_reset_raw(delay)?)?;
+        let err_code = extract_hierarchical(&response, &["system", "reset", "err_code"])?;
+
+        Ok(err_code == 0)
+    }
 }
 
 fn extract_hierarchical(response: &Value, path: &[&str]) -> anyhow::Result<Value> {
