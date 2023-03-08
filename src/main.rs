@@ -1,4 +1,5 @@
 use clap::{arg, Command};
+use serde_json::to_string_pretty;
 use tplink_hs1x0::HS110;
 
 /*
@@ -30,7 +31,7 @@ fn main() -> anyhow::Result<()> {
             println!("{}", hs110.info_raw()?)
         }
         Some(("info", _)) => {
-            println!("{:#?}", hs110.info_parsed()?)
+            println!("{}", to_string_pretty(&hs110.info_parsed()?)?)
         }
         Some(("led", sub_matches)) => {
             let switch_on = sub_matches.get_flag("on");
@@ -71,21 +72,21 @@ fn main() -> anyhow::Result<()> {
             println!("Power is {}", if power { "ON" } else { "OFF" });
         }
         Some(("cloudinfo", _)) => {
-            println!("{:#?}", hs110.cloudinfo_parsed()?)
+            println!("{}", to_string_pretty(&hs110.cloudinfo_parsed()?)?)
         }
         Some(("wifi", sub_matches)) => match sub_matches.subcommand() {
             Some(("scan", _)) => {
-                println!("{:#?}", hs110.ap_list_parsed(true)?);
+                println!("{}", to_string_pretty(&hs110.ap_list_parsed(true)?)?);
             }
             Some(("list", _)) => {
-                println!("{:#?}", hs110.ap_list_parsed(false)?)
+                println!("{}", to_string_pretty(&hs110.ap_list_parsed(false)?)?)
             }
             _ => {
                 unreachable!()
             }
         },
         Some(("emeter", _)) => {
-            println!("{:#?}", hs110.emeter_parsed()?)
+            println!("{}", to_string_pretty(&hs110.emeter_parsed()?)?)
         }
         Some(("reboot", sub_matches)) => {
             let delay = sub_matches.get_one::<u32>("delay").map(|v| *v);
