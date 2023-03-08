@@ -13,7 +13,7 @@ use tplink_hs1x0::HS110;
             'schedule' : '{"schedule":{"get_rules":{}}}',
             'countdown': '{"count_down":{"get_rules":{}}}',
             'antitheft': '{"anti_theft":{"get_rules":{}}}',
-            'reboot'   : '{"system":{"reboot":{"delay":1}}}',
+ *          'reboot'   : '{"system":{"reboot":{"delay":1}}}',
             'reset'    : '{"system":{"reset":{"delay":1}}}',
  *          'energy'   : '{"emeter":{"get_realtime":{}}}'
 */
@@ -45,10 +45,7 @@ fn main() -> anyhow::Result<()> {
                 }
 
                 let status = hs110.set_led_state_parsed(switch_on)?;
-                println!(
-                    "Operation has {}",
-                    if status { "succeeded" } else { "failed" }
-                );
+                print_status(status);
             }
 
             let led = hs110.led_status()?;
@@ -67,10 +64,7 @@ fn main() -> anyhow::Result<()> {
                 }
 
                 let status = hs110.set_power_state_parsed(switch_on)?;
-                println!(
-                    "Operation has {}",
-                    if status { "succeeded" } else { "failed" }
-                );
+                print_status(status);
             }
 
             let power = hs110.power_state()?;
@@ -92,6 +86,12 @@ fn main() -> anyhow::Result<()> {
         },
         Some(("emeter", _)) => {
             println!("{:#?}", hs110.emeter_parsed()?)
+        }
+        Some(("reboot", sub_matches)) => {
+            let delay = sub_matches.get_one::<u32>("delay").map(|v| *v);
+
+            let status = hs110.reboot_parsed(delay)?;
+            print_status(status);
         }
         _ => {
             unreachable!()
@@ -166,6 +166,23 @@ fn cli() -> Command {
                 ),
         )
         .subcommand(
+            Command::new("reboot")
+                .about("Reboot a smart plug (causes power interruption for connected devices)")
+                .arg(
+                    arg!(--delay <NUMBER> "Delay a reboot by NUMBER of seconds")
+                        .short('d')
+                        .value_parser(clap::value_parser!(u32))
+                        .num_args(1),
+                ),
+        )
+        .subcommand(
             Command::new("emeter").about("Get energy meter readings (voltage, current, power)"),
         )
+}
+
+fn print_status(status: bool) {
+    println!(
+        "Operation has {}",
+        if status { "succeeded" } else { "failed" }
+    );
 }

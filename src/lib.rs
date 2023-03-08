@@ -222,6 +222,17 @@ impl HS110 {
 
         Ok(emeter)
     }
+
+    fn reboot_raw(&self, delay: Option<u32>) -> anyhow::Result<String> {
+        self.request(&json!({"system": {"reboot": {"delay": delay.unwrap_or(0) }}}))
+    }
+
+    pub fn reboot_parsed(&self, delay: Option<u32>) -> anyhow::Result<bool> {
+        let response = serde_json::from_str::<Value>(&self.reboot_raw(delay)?)?;
+        let err_code = extract_hierarchical(&response, &["system", "reboot", "err_code"])?;
+
+        Ok(err_code == 0)
+    }
 }
 
 fn extract_hierarchical(response: &Value, path: &[&str]) -> anyhow::Result<Value> {
