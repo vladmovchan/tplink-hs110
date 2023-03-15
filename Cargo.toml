@@ -2,6 +2,10 @@
 name = "tplink-hs110"
 version = "0.1.0"
 edition = "2021"
+authors = ["Vladyslav Movchan"]
+license = "MIT OR Apache-2.0"
+description = "A CLI tool and a library to control TP-Link HS110/HS100 SmartPlugs over WiFi"
+repository = "https://github.com/vladmovchan/tplink-hs110"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
