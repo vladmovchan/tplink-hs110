@@ -1,3 +1,6 @@
+[![Crates.io](https://img.shields.io/crates/v/tplink-hs110.svg)](https://crates.io/crates/tplink-hs110)
+[![Documentation](https://docs.rs/tplink-hs110/badge.svg)](https://docs.rs/tplink-hs110/)
+
 ## A CLI tool and a library to control TP-Link HS110 (and HS100) SmartPlugs over WiFi ##
 
 ### Build ###

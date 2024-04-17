@@ -1,17 +1,21 @@
 use clap::{arg, Command};
 use serde_json::to_string_pretty;
-use tplink_hs110::HS110;
+use tplink_hs110::{error::TpLinkHs110Error, HS110};
 
-fn main() -> anyhow::Result<()> {
+fn main() -> Result<(), TpLinkHs110Error> {
     let matches = cli().get_matches();
 
-    let hostname = matches.get_one::<String>("HOST").expect("required");
-    let port = matches.get_one::<u16>("port").expect("defaulted in clap");
-    let hs110 = HS110::new(&format!("{hostname}:{port}"));
+    let hostname = matches
+        .get_one::<String>("HOST")
+        .ok_or(TpLinkHs110Error::HostIsNotProvided)?;
+    let port = matches
+        .get_one::<u16>("port")
+        .ok_or(TpLinkHs110Error::PortIsNotProvided)?;
+    let smartplug = HS110::new(&format!("{hostname}:{port}"))?;
 
     match matches.subcommand() {
         Some(("info", _)) => {
-            println!("{}", to_string_pretty(&hs110.info()?)?)
+            println!("{}", to_string_pretty(&smartplug.info()?)?)
         }
         Some(("led", sub_matches)) => {
             let switch_on = sub_matches.get_flag("on");
@@ -19,18 +23,18 @@ fn main() -> anyhow::Result<()> {
 
             // Clap disallows to set both flags at the same time:
             if switch_on ^ switch_off {
-                let led = hs110.led_status()?;
+                let led: bool = smartplug.led_state()?.into();
                 if led && switch_on || (!led && switch_off) {
                     println!("LED is already {}", if led { "ON" } else { "OFF" });
                     return Ok(());
                 }
 
-                let status = hs110.set_led_state(switch_on)?;
-                print_op_status(status);
+                smartplug.set_led_state(switch_on.into())?;
+                println!("Operation completed successfully");
             }
 
-            let led = hs110.led_status()?;
-            println!("LED is {}", if led { "ON" } else { "OFF" });
+            let led_state = smartplug.led_state()?;
+            println!("LED is {led_state}");
         }
         Some(("power", sub_matches)) => {
             let switch_on = sub_matches.get_flag("on");
@@ -38,47 +42,47 @@ fn main() -> anyhow::Result<()> {
 
             // Clap disallows to set both flags at the same time:
             if switch_on ^ switch_off {
-                let power = hs110.power_state()?;
+                let power: bool = smartplug.power_state()?.into();
                 if power && switch_on || (!power && switch_off) {
                     println!("Power is already {}", if power { "ON" } else { "OFF" });
                     return Ok(());
                 }
 
-                let status = hs110.set_power_state(switch_on)?;
-                print_op_status(status);
+                smartplug.set_power_state(switch_on.into())?;
+                println!("Operation completed successfully");
             }
 
-            let power = hs110.power_state()?;
-            println!("Power is {}", if power { "ON" } else { "OFF" });
+            let power_state = smartplug.power_state()?;
+            println!("Power is {power_state}");
         }
         Some(("cloudinfo", _)) => {
-            println!("{}", to_string_pretty(&hs110.cloudinfo()?)?)
+            println!("{}", to_string_pretty(&smartplug.cloudinfo()?)?)
         }
         Some(("wifi", sub_matches)) => match sub_matches.subcommand() {
             Some(("scan", _)) => {
-                println!("{}", to_string_pretty(&hs110.ap_list(true)?)?);
+                println!("{}", to_string_pretty(&smartplug.ap_list(true)?)?);
             }
             Some(("list", _)) => {
-                println!("{}", to_string_pretty(&hs110.ap_list(false)?)?)
+                println!("{}", to_string_pretty(&smartplug.ap_list(false)?)?)
             }
             _ => {
                 unreachable!()
             }
         },
         Some(("emeter", _)) => {
-            println!("{}", to_string_pretty(&hs110.emeter()?)?)
+            println!("{}", to_string_pretty(&smartplug.emeter()?)?)
         }
         Some(("reboot", sub_matches)) => {
             let delay = sub_matches.get_one::<u32>("delay").copied();
 
-            let status = hs110.reboot(delay)?;
-            print_op_status(status);
+            smartplug.reboot(delay)?;
+            println!("Operation completed successfully");
         }
         Some(("factory-reset", sub_matches)) => {
             let delay = sub_matches.get_one::<u32>("delay").copied();
 
-            let status = hs110.factory_reset(delay)?;
-            print_op_status(status);
+            smartplug.factory_reset(delay)?;
+            println!("Operation completed successfully");
         }
         _ => {
             unreachable!()
@@ -172,11 +176,4 @@ fn cli() -> Command {
         .subcommand(
             Command::new("emeter").about("Get energy meter readings (voltage, current, power)"),
         )
-}
-
-fn print_op_status(status: bool) {
-    println!(
-        "Operation has {}",
-        if status { "succeeded" } else { "failed" }
-    );
 }

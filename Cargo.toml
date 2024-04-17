@@ -1,20 +1,19 @@
 [package]
 name = "tplink-hs110"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 authors = ["Vladyslav Movchan"]
 license = "MIT OR Apache-2.0"
-description = "A CLI tool and a library to control TP-Link HS110/HS100 SmartPlugs over WiFi"
+
+description = "A CLI tool and a library to control TP-Link HS110/HS100 SmartPlugs over Wi-Fi"
 repository = "https://github.com/vladmovchan/tplink-hs110"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
-anyhow = "1.0.68"
-clap = { version = "4.0.32", features = ["derive"] }
-serde = { version = "1.0.152", features = ["derive"] }
-serde_json = "1.0.91"
+clap = { version = "4.5.4", features = ["derive"] }
+serde = { version = "1.0.198", features = ["derive"] }
+serde_json = "1.0.116"
+thiserror = "1.0.58"
 
 [dev-dependencies]
-once_cell = "1.17.1"
-serial_test = "1.0.0"
+once_cell = "1.19.0"
+serial_test = "3.0.0"
